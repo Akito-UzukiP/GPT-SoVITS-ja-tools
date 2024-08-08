@@ -1,0 +1,10 @@
+{
+    "sample":{
+    "transcript_path": "models/sample/transcript.txt",
+    "gpt_weight": "models/sample/sample-e00.ckpt",
+    "sovits_weight": "models/sample/sample_e0_s0.pth",
+    "title": "test",
+    "cover": "",
+    "example_reference": "example_reference"        
+    }   
+}

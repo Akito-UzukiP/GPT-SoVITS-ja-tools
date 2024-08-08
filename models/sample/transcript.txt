@@ -1,0 +1,1 @@
+sample.mp3|sample|ja|これはサンプル音声です。
