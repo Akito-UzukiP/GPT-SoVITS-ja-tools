@@ -5,9 +5,9 @@ os.environ["version"] = 'v2'
 import re
 import gradio as gr
 from transformers import AutoModelForMaskedLM, AutoTokenizer
-import torch,numpy as np
+import numpy as np
 from pathlib import Path
-import os,librosa,torch
+import os,librosa,torch, audiosegment
 from feature_extractor import cnhubert
 cnhubert.cnhubert_base_path=cnhubert_base_path
 from module.models import SynthesizerTrn
@@ -16,6 +16,7 @@ from text import cleaned_text_to_sequence
 from text.cleaner import clean_text
 from time import time as ttime
 from module.mel_processing import spectrogram_torch
+import tempfile
 from my_utils import load_audio
 import os
 import json
@@ -144,7 +145,7 @@ def get_spepc(hps, filename):
     return spec
 
 def create_tts_fn(vq_model, ssl_model, t2s_model, hps, config, hz, max_sec):
-    def tts_fn(ref_wav_path, prompt_text, prompt_language, target_phone, text_language):
+    def tts_fn(ref_wav_path, prompt_text, prompt_language, target_phone, text_language, target_text = None):
         t0 = ttime()
         prompt_text=prompt_text.strip()
         prompt_language=prompt_language
@@ -223,7 +224,12 @@ def create_tts_fn(vq_model, ssl_model, t2s_model, hps, config, hz, max_sec):
             audio_opt.append(zero_wav)
             t4 = ttime()
         print("%.3f\t%.3f\t%.3f\t%.3f" % (t1 - t0, t2 - t1, t3 - t2, t4 - t3))
-        return "Success", (hps.data.sampling_rate,(np.concatenate(audio_opt,0)*32768).astype(np.int16))
+
+        audio = (hps.data.sampling_rate,(np.concatenate(audio_opt,0)*32768).astype(np.int16))
+        
+        filename = tempfile.mktemp(suffix=".wav",prefix=f"{prompt_text[:8]}_{target_text[:8]}_")
+        audiosegment.from_numpy_array(audio[1], framerate=audio[0]).export(filename, format="WAV")
+        return "Success", (hps.data.sampling_rate,(np.concatenate(audio_opt,0)*32768).astype(np.int16)), filename
     return tts_fn
 
 
@@ -349,6 +355,7 @@ with gr.Blocks() as app:
                         inference_button = gr.Button("Generate", variant="primary")
                         cleaned_text = gr.Textbox(label="Cleaned Text")
                         output = gr.Audio(label="Output Audio")
+                        output_file = gr.File(label="Output Audio File")
                         om = gr.Textbox(label="Output Message")
                         clean_button.click(
                             fn=get_str_list_from_phone,
@@ -357,8 +364,8 @@ with gr.Blocks() as app:
                         )
                         inference_button.click(
                             fn=tts_fn,
-                            inputs=[inp_ref_audio, prompt_text, prompt_language, cleaned_text, text_language],
-                            outputs=[om, output]
+                            inputs=[inp_ref_audio, prompt_text, prompt_language, cleaned_text, text_language, text],
+                            outputs=[om, output, output_file]
                         )
 
 app.launch(share=True)
